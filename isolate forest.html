@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isolation Forest Interactive Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-blue: #38bdf8;
+            --accent-orange: #fb923c;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+        }
+
+        .analogy {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        .analogy strong {
+            color: var(--text-main);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            flex: 1;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .canvas-container {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            min-height: 500px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+            background-color: #0b0f19;
+        }
+
+        .sidebar {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-bottom: 5px;
+            color: var(--text-main);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #334155;
+            color: var(--text-main);
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        button:hover {
+            background-color: #475569;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.primary-btn {
+            background-color: #2563eb;
+        }
+
+        button.primary-btn:hover {
+            background-color: #3b82f6;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .control-label span.val {
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .stats-panel {
+            background-color: #0b0f19;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            margin-top: auto;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .stat-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Isolation Forest Anomaly Detection Simulator</h1>
+        <div class="analogy">
+            <strong>The Library Intruder Analogy:</strong> Imagine a quiet library filled with groups of regular students studying closely together (<strong>Normal Data</strong>). They are highly organized and hard to separate. Now imagine a few noisy clowns running wild in the corners (<strong>Anomalies</strong>). If you draw random partitions across the room, the lone clowns are isolated instantly within just a few lines. The normal students, packed deeply in crowds, require dozens of slices to isolate. This algorithm flags points that isolate fast!
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="canvas-container" id="canvasHolder">
+            <canvas id="plotCanvas"></canvas>
+        </div>
+
+        <div class="sidebar">
+            <div class="section-title">Controls</div>
+            <div class="btn-group">
+                <button id="btnScatter">
+                    <span>1. Scatter Points (Normal)</span>
+                    <span style="color: var(--accent-blue);">●</span>
+                </button>
+                <button id="btnAddAnomalies">
+                    <span>2. Add Anomalies (Outliers)</span>
+                    <span style="color: var(--accent-orange);">●</span>
+                </button>
+                <button id="btnRun" class="primary-btn">
+                    <span>3. Run Isolation Forest</span>
+                    <span>⚡</span>
+                </button>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Number of Trees (t)</span>
+                    <span id="lblTrees" class="val">100</span>
+                </div>
+                <input type="range" id="sliderTrees" min="1" max="150" value="100">
+            </div>
+
+            <div class="control-group">
+                <div class="control-label">
+                    <span>Anomaly Threshold</span>
+                    <span id="lblThreshold" class="val">0.60</span>
+                </div>
+                <input type="range" id="sliderThreshold" min="0.3" max="1.0" step="0.01" value="0.60">
+            </div>
+
+            <div class="stats-panel">
+                <div class="section-title" style="font-size:0.95rem; margin-bottom:10px; border-bottom: 1px solid #1e293b;">Live Statistics</div>
+                <div class="stat-row">
+                    <span>Total Points:</span>
+                    <span id="statTotal" style="font-weight: bold;">0</span>
+                </div>
+                <div class="stat-row">
+                    <span><span class="color-dot" style="background: #38bdf8;"></span>Normal Points:</span>
+                    <span id="statNormal" style="color: #38bdf8; font-weight: bold;">0</span>
+                </div>
+                <div class="stat-row">
+                    <span><span class="color-dot" style="background: #ef4444;"></span>Detected Anomalies:</span>
+                    <span id="statAnomalies" style="color: #ef4444; font-weight: bold;">0</span>
+                </div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; line-height: 1.3;">
+                💡 *Tip: You can also click directly inside the grid map above to place custom data points manually!*
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Setup state variables
+        const canvas = document.getElementById('plotCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvasHolder');
+
+        let dataPoints = [];
+        let isEvaluated = false;
+
+        // UI Controls elements
+        const btnScatter = document.getElementById('btnScatter');
+        const btnAddAnomalies = document.getElementById('btnAddAnomalies');
+        const btnRun = document.getElementById('btnRun');
+        const sliderTrees = document.getElementById('sliderTrees');
+        const sliderThreshold = document.getElementById('sliderThreshold');
+        const lblTrees = document.getElementById('lblTrees');
+        const lblThreshold = document.getElementById('lblThreshold');
+
+        // Statistics elements
+        const statTotal = document.getElementById('statTotal');
+        const statNormal = document.getElementById('statNormal');
+        const statAnomalies = document.getElementById('statAnomalies');
+
+        // Sync Slider readouts
+        sliderTrees.addEventListener('input', () => lblTrees.textContent = sliderTrees.value);
+        sliderThreshold.addEventListener('input', () => {
+            lblThreshold.textContent = parseFloat(sliderThreshold.value).toFixed(2);
+            if (isEvaluated) {
+                evaluateThresholds();
+                draw();
+            }
+        });
+
+        // Resize handler to match container layout dynamically
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Core Helper: generates normally distributed samples using Box-Muller transform
+        function randomNormal(mean, stdDev) {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random(); 
+            while(v === 0) v = Math.random();
+            return mean + stdDev * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        // Action 1: Create densely clustered data structures (Normal instances)
+        btnScatter.addEventListener('click', () => {
+            dataPoints = [];
+            isEvaluated = false;
+            
+            const countPerCluster = 90; 
+            
+            // Cluster 1 (Bottom Left area)
+            const c1X = canvas.width * 0.35;
+            const c1Y = canvas.height * 0.65;
+            const spread1 = Math.min(canvas.width, canvas.height) * 0.07;
+            for(let i = 0; i < countPerCluster; i++) {
+                dataPoints.push({
+                    x: randomNormal(c1X, spread1),
+                    y: randomNormal(c1Y, spread1),
+                    type: 'normal', // baseline type prior to execution
+                    score: 0
+                });
+            }
+
+            // Cluster 2 (Top Right area)
+            const c2X = canvas.width * 0.65;
+            const c2Y = canvas.height * 0.35;
+            const spread2 = Math.min(canvas.width, canvas.height) * 0.06;
+            for(let i = 0; i < countPerCluster; i++) {
+                dataPoints.push({
+                    x: randomNormal(c2X, spread2),
+                    y: randomNormal(c2Y, spread2),
+                    type: 'normal',
+                    score: 0
+                });
+            }
+
+            updateStats();
+            draw();
+        });
+
+        // Action 2: Add distant, sparse outliers 
+        btnAddAnomalies.addEventListener('click', () => {
+            isEvaluated = false;
+            const outlierCount = 12;
+            const margin = 40;
+
+            for(let i = 0; i < outlierCount; i++) {
+                let x, y;
+                // Place anomalies explicitly near random outer boundary limits
+                if (Math.random() < 0.5) {
+                    x = Math.random() < 0.5 ? margin + Math.random()*60 : canvas.width - margin - Math.random()*60;
+                    y = margin + Math.random() * (canvas.height - 2*margin);
+                } else {
+                    x = margin + Math.random() * (canvas.width - 2*margin);
+                    y = Math.random() < 0.5 ? margin + Math.random()*60 : canvas.height - margin - Math.random()*60;
+                }
+                dataPoints.push({ x: x, y: y, type: 'anomaly-raw', score: 0 });
+            }
+            updateStats();
+            draw();
+        });
+
+        // Interactive Placement: Mouse clicks to inject custom coordinates
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            isEvaluated = false;
+            // Let context decide: closer to center mimics an added normal point, edges mimic outlier
+            dataPoints.push({
+                x: mouseX,
+                y: mouseY,
+                type: 'normal',
+                score: 0
+            });
+            updateStats();
+            draw();
+        });
+
+        // Helper calculations according to official paper specifications
+        // c(n) calculates average depth bounds for un-isolated BST branches
+        function c(n) {
+            if (n <= 1) return 0;
+            if (n === 2) return 1;
+            const eulerConstant = 0.5772156649;
+            return 2.0 * (Math.log(n - 1) + eulerConstant) - (2.0 * (n - 1) / n);
+        }
+
+        // Recursive iTree generation logic node block
+        function iTree(X, currentHeight, maxHeight) {
+            if (currentHeight >= maxHeight || X.length <= 1) {
+                return { size: X.length, isLeaf: true };
+            }
+
+            // Select feature dimension randomly (0 = X axis, 1 = Y axis)
+            const splitAttribute = Math.random() < 0.5 ? 'x' : 'y';
+            
+            // Extract boundaries for selected feature
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+            for(let i=0; i<X.length; i++) {
+                const val = X[i][splitAttribute];
+                if(val < minVal) minVal = val;
+                if(val > maxVal) maxVal = maxVal;
+            }
+
+            // Avoid division faults on duplicate feature domains
+            if (minVal === maxVal) {
+                return { size: X.length, isLeaf: true };
+            }
+
+            // Choose uniform random split threshold
+            const splitValue = minVal + Math.random() * (maxVal - minVal);
+
+            // Fragment dataset arrays
+            const leftDataset = [];
+            const rightDataset = [];
+            for (let i = 0; i < X.length; i++) {
+                if (X[i][splitAttribute] < splitValue) {
+                    leftDataset.push(X[i]);
+                } else {
+                    rightDataset.push(X[i]);
+                }
+            }
+
+            return {
+                isLeaf: false,
+                splitAttribute: splitAttribute,
+                splitValue: splitValue,
+                left: iTree(leftDataset, currentHeight + 1, maxHeight),
+                right: iTree(rightDataset, currentHeight + 1, maxHeight)
+            };
+        }
+
+        // Trace standard structural depth down a specific iTree instance
+        function pathLength(instance, node, currentHeight) {
+            if (node.isLeaf) {
+                return currentHeight + c(node.size);
+            }
+            const attr = node.splitAttribute;
+            if (instance[attr] < node.splitValue) {
+                return pathLength(instance, node.left, currentHeight + 1);
+            } else {
+                return pathLength(instance, node.right, currentHeight + 1);
+            }
+        }
+
+        // Action 3: Engine Execution for Isolation Forest Simulation
+        btnRun.addEventListener('click', () => {
+            if (dataPoints.length === 0) return;
+
+            const numTrees = parseInt(sliderTrees.value);
+            const subSampleSize = Math.min(256, dataPoints.length);
+            const maxHeight = Math.ceil(Math.log2(Math.max(subSampleSize, 2)));
+
+            const forests = [];
+
+            // Build Ensemble iTrees
+            for (let t = 0; t < numTrees; t++) {
+                // Generate unique random subsamples without replacement
+                const shuffled = [...dataPoints].sort(() => 0.5 - Math.random());
+                const sample = shuffled.slice(0, subSampleSize);
+                forests.push(iTree(sample, 0, maxHeight));
+            }
+
+            // Estimate global average paths and compute final output anomaly scores
+            const avgC = c(subSampleSize);
+
+            dataPoints.forEach(point => {
+                let totalPath = 0;
+                for (let t = 0; t < numTrees; t++) {
+                    totalPath += pathLength(point, forests[t], 0);
+                }
+                const meanPath = totalPath / numTrees;
+                
+                // Formula mapping: s(x, n) = 2^(-E(h(x)) / c(n))
+                point.score = avgC === 0 ? 0 : Math.pow(2, -(meanPath / avgC));
+            });
+
+            isEvaluated = true;
+            evaluateThresholds();
+            draw();
+        });
+
+        // Threshold and label assignment modifier loop
+        function evaluateThresholds() {
+            const currentThreshold = parseFloat(sliderThreshold.value);
+            dataPoints.forEach(point => {
+                if (point.score >= currentThreshold) {
+                    point.type = 'anomaly';
+                } else {
+                    point.type = 'normal';
+                }
+            });
+            updateStats();
+        }
+
+        // Statistical element panel state modifications
+        function updateStats() {
+            statTotal.textContent = dataPoints.length;
+            const normals = dataPoints.filter(p => p.type === 'normal' || p.type === 'anomaly-raw').length;
+            const anomalies = dataPoints.filter(p => p.type === 'anomaly').length;
+            statNormal.textContent = normals;
+            statAnomalies.textContent = anomalies;
+        }
+
+        // Core UI Canvas drawing function loop
+        function draw() {
+            // Clear current layout frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Render modern grid map backdrop layout
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            const gridSpacing = 40;
+            for (let x = 0; x < canvas.width; x += gridSpacing) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSpacing) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Render localized scatter points
+            dataPoints.forEach(point => {
+                ctx.beginPath();
+                
+                if (isEvaluated) {
+                    if (point.type === 'anomaly') {
+                        // Calculate scaling proportional factor relative to the severity threshold
+                        const delta = Math.max(0, point.score - parseFloat(sliderThreshold.value));
+                        const radius = 6 + delta * 24; 
+                        
+                        ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+                        ctx.fillStyle = `rgba(239, 68, 68, ${0.4 + delta * 2})`; // Dynamic Alpha glow
+                        ctx.fill();
+                        
+                        // Solid core point center accent anchor
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#ef4444';
+                        ctx.fill();
+                    } else {
+                        // Regular unisolated baseline nodes render profiles
+                        ctx.arc(point.x, point.y, 4.5, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.fill();
+                        ctx.strokeStyle = '#0284c7';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                } else {
+                    // Pre-evaluated initialization pipeline visualizations configurations
+                    ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+                    if (point.type === 'anomaly-raw') {
+                        ctx.fillStyle = '#fb923c'; // Highlight prospective raw outliers orange
+                        ctx.strokeStyle = '#ea580c';
+                    } else {
+                        ctx.fillStyle = '#64748b'; // Plain gray for initialized uncalculated records
+                        ctx.strokeStyle = '#475569';
+                    }
+                    ctx.fill();
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Bootstrap implementation script loading instantiation properties
+        resizeCanvas();
+        // Trigger simulation default configuration startup dataset rendering metrics automatically
+        btnScatter.click();
+    </script>
+</body>
+</html>
